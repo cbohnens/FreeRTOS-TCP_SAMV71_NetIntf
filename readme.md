@@ -1,4 +1,11 @@
-## [SAMV71(Q21)](http://www.microchip.com/wwwproducts/en/ATSAMV71Q21) Network Interface for [KSZ8061RNB](http://www.microchip.com/wwwproducts/en/KSZ8061) Ethernet PHY
+Code mostly taken from the Repository below. Minor changes to account for the different 
+number of Priority Queues in the SAME70 and similar chips, and the different PHY on the
+ SAME70-XPLAINED board.
+
+
+#### Original Readme from [https://github.com/jtbr/FreeRTOS-TCP_SAMV71_NetIntf]:
+
+### [SAMV71(Q21)](http://www.microchip.com/wwwproducts/en/ATSAMV71Q21) Network Interface for [KSZ8061RNB](http://www.microchip.com/wwwproducts/en/KSZ8061) Ethernet PHY
 
 This NetworkInterface.c implementation is based on the FreeRTOS+TCP-
 provided ATSAM4E microcontroller implementation. It relies upon the 

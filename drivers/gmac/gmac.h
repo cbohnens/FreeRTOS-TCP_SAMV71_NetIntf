@@ -159,6 +159,12 @@ typedef enum  {
 	GMAC_QUE_1 = 1,
 	GMAC_QUE_2 = 2,
 #endif
+/* Only SAMV71B and SAME70B devices have GMAC peripheral in Cortex-m7 devices*/
+#if (SAMV71B || SAME70B)
+	GMAC_QUE_3 = 3,
+	GMAC_QUE_4 = 4,
+	GMAC_QUE_5 = 5,
+#endif
 #  if !defined(__DOXYGEN__)
 	GMAC_QUE_N,
 #  endif

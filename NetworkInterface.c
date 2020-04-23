@@ -238,7 +238,7 @@ const TickType_t x5_Seconds = 5000UL;
 	if( xEMACTaskHandle == NULL )
 	{
 		if (prvGMACInit() != pdPASS) {
-			FreeRTOS_printf( ("prvGMACInit failed. Link may be disconnected or down. Will retry.\n") );
+			FreeRTOS_printf( ("prvGMACInit failed. Link may be disconnected or down. Will retry.\r\n") );
 			return pdFAIL;
 		}
 
@@ -285,7 +285,7 @@ uint32_t uiResult;
 		if (uiResult == GMAC_OK)
 			iptraceNETWORK_INTERFACE_TRANSMIT();
 		else
-			FreeRTOS_printf(("Unsuccessful packet send\n"));
+			FreeRTOS_printf(("Unsuccessful packet send\r\n"));
 	}
 
 	if( bReleaseAfterSend != pdFALSE )
@@ -310,6 +310,8 @@ uint8_t result;
 	memcpy( gmac_option.uc_mac_addr, ipLOCAL_MAC_ADDRESS, sizeof( gmac_option.uc_mac_addr ) );
 	gs_gmac_dev.p_hw = GMAC;
 
+	/* Enable GMAC clock. */
+	pmc_enable_periph_clk(ID_GMAC);
 	/* Initialize GMAC device */
 	gmac_dev_init( GMAC, &gs_gmac_dev, &gmac_option );
 	
@@ -408,7 +410,7 @@ const TickType_t xShortTime = pdMS_TO_TICKS( 100UL );
 		vTaskDelay( xShortTime );
 	}
 
-	FreeRTOS_printf( ( "xGMACWaitLS: %ld (PHY %d) periph freq %lu Mhz\n",
+	FreeRTOS_printf( ( "xGMACWaitLS: %ld (PHY %d) periph freq %lu Mhz\r\n",
 		xReturn,
 		ethernet_phy_addr,
 		sysclk_get_peripheral_hz() / HZ_PER_MHZ ) );
@@ -502,7 +504,7 @@ static IPStackEvent_t xRxEvent = { eNetworkRxEvent, NULL };
 			again. */
 			vReleaseNetworkBufferAndDescriptor( pxNextNetworkBufferDescriptor );
 			iptraceETHERNET_RX_EVENT_LOST();
-			FreeRTOS_printf( ( "prvEMACRxPoll: Can not queue return packet!\n" ) );
+			FreeRTOS_printf( ( "prvEMACRxPoll: Can not queue return packet!\r\n" ) );
 		}
 
 		/* Now the buffer has either been passed to the IP-task,
@@ -545,7 +547,7 @@ const TickType_t ulMaxBlockTime = pdMS_TO_TICKS( EMAC_MAX_BLOCK_TIME_MS );
 		{
 			/* The logging produced below may be helpful
 			while tuning +TCP: see how many buffers are in use. */
-			FreeRTOS_debug_printf( ( "Network buffers: %lu lowest %lu\n",
+			FreeRTOS_debug_printf( ( "Network buffers: %lu lowest %lu\r\n",
 				uxCurrentCount, uxGetMinimumFreeNetworkBuffers() ) );
 		}
 		uxLastBufferCount = uxCurrentCount;
@@ -558,7 +560,7 @@ const TickType_t ulMaxBlockTime = pdMS_TO_TICKS( EMAC_MAX_BLOCK_TIME_MS );
 				/* The logging produced below may be helpful
 				while tuning +TCP: see how many buffers are in use. */
 				uxLastMinQueueSpace = uxCurrentCount;
-				FreeRTOS_debug_printf( ( "Queue space: lowest %lu\n", uxCurrentCount ) );
+				FreeRTOS_debug_printf( ( "Queue space: lowest %lu\r\n", uxCurrentCount ) );
 			}
 		}
 		#endif /* ipconfigCHECK_IP_QUEUE_SPACE */
@@ -607,7 +609,7 @@ const TickType_t ulMaxBlockTime = pdMS_TO_TICKS( EMAC_MAX_BLOCK_TIME_MS );
 			if( ( ulPHYLinkStatus & BMSR_LINK_STATUS ) != ( xStatus & BMSR_LINK_STATUS ) )
 			{
 				ulPHYLinkStatus = xStatus;
-				FreeRTOS_printf( ( "prvEMACHandlerTask: PHY LS now %d\n", ( ulPHYLinkStatus & BMSR_LINK_STATUS ) != 0 ) );
+				FreeRTOS_printf( ( "prvEMACHandlerTask: PHY LS now %d\r\n", ( ulPHYLinkStatus & BMSR_LINK_STATUS ) != 0 ) );
 				// Handling link going down and coming back up is unsupported...
 				//if( ( ulPHYLinkStatus & BMSR_LINK_STATUS ) == 0 ) {
 					//FreeRTOS_NetworkDown();
