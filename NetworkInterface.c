@@ -542,13 +542,12 @@ const TickType_t ulMaxBlockTime = pdMS_TO_TICKS( EMAC_MAX_BLOCK_TIME_MS );
 
 	for( ;; )
 	{
-		uxCurrentCount = uxGetNumberOfFreeNetworkBuffers();
+		uxCurrentCount = uxGetMinimumFreeNetworkBuffers();
 		if( uxLastBufferCount != uxCurrentCount )
 		{
 			/* The logging produced below may be helpful
 			while tuning +TCP: see how many buffers are in use. */
-			FreeRTOS_debug_printf( ( "Network buffers: %lu lowest %lu\r\n",
-				uxCurrentCount, uxGetMinimumFreeNetworkBuffers() ) );
+			FreeRTOS_debug_printf( ( "Lowest network buffers: %lu\r\n", uxCurrentCount ) );
 		}
 		uxLastBufferCount = uxCurrentCount;
 
