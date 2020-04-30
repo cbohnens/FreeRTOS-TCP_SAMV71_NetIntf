@@ -101,7 +101,7 @@
 #ifndef	PHY_LS_HIGH_CHECK_TIME_MS
 	/* Check if the LinkSStatus in the PHY is still high after 10 seconds of not
 	receiving packets. */
-	#define PHY_LS_HIGH_CHECK_TIME_MS	10000
+	#define PHY_LS_HIGH_CHECK_TIME_MS	5000
 #endif
 
 #ifndef	PHY_LS_LOW_CHECK_TIME_MS
@@ -210,14 +210,11 @@ void GMAC_Handler(void)
 	the value of xGMACSwitchRequired. */
 	gmac_handler( &gs_gmac_dev, QUEUE_INDEX );
 
-	if( xGMACSwitchRequired != pdFALSE )
-	{
-		portEND_SWITCHING_ISR( xGMACSwitchRequired );
-	}
+	portEND_SWITCHING_ISR( xGMACSwitchRequired );
 }
 /*-----------------------------------------------------------*/
 
-/* Rx interrupt callback, with status from Recieve Status Register */
+/* Rx interrupt callback, with status from Receive Status Register */
 static void prvRxCallback( uint32_t ulStatus )
 {
 	if( ( ( ulStatus & GMAC_RSR_REC ) != 0 ) && ( xEMACTaskHandle != NULL ) )
@@ -251,7 +248,7 @@ const TickType_t x5_Seconds = 5000UL;
 		configASSERT( xEMACTaskHandle );
 	}
 	/* When returning non-zero, the stack will become active and
-    start DHCP (in configured) */
+    start DHCP (if configured) */
 	return ( ulPHYLinkStatus & BMSR_LINK_STATUS ) != 0;
 }
 /*-----------------------------------------------------------*/
@@ -298,59 +295,67 @@ uint32_t uiResult;
 
 static BaseType_t prvGMACInit( void )
 {
+static BaseType_t xGmacInitialized = pdFALSE;
 gmac_options_t gmac_option;
 uint32_t mck_hz;
 uint8_t result;
 
-	/* Set GMAC options to copy all frames and support broadcast */
-	/* Use primary mac address ipLOCAL_MAC_ADDRESS */
-	memset( &gmac_option, '\0', sizeof( gmac_option ) );
-	gmac_option.uc_copy_all_frame = 0;
-	gmac_option.uc_no_broadcast = 0;
-	memcpy( gmac_option.uc_mac_addr, ipLOCAL_MAC_ADDRESS, sizeof( gmac_option.uc_mac_addr ) );
-	gs_gmac_dev.p_hw = GMAC;
+	if( xGmacInitialized == pdFALSE )
+	{
+		/* Set GMAC options to copy all frames and support broadcast */
+		/* Use primary mac address ipLOCAL_MAC_ADDRESS */
+		memset( &gmac_option, '\0', sizeof( gmac_option ) );
+		gmac_option.uc_copy_all_frame = 0;
+		gmac_option.uc_no_broadcast = 0;
+		memcpy( gmac_option.uc_mac_addr, ipLOCAL_MAC_ADDRESS, sizeof( gmac_option.uc_mac_addr ) );
+		gs_gmac_dev.p_hw = GMAC;
 
-	/* Enable GMAC clock. */
-	pmc_enable_periph_clk(ID_GMAC);
-	/* Initialize GMAC device */
-	gmac_dev_init( GMAC, &gs_gmac_dev, &gmac_option );
+		/* Enable GMAC clock. */
+		pmc_enable_periph_clk(ID_GMAC);
+		/* Initialize GMAC device */
+		gmac_dev_init( GMAC, &gs_gmac_dev, &gmac_option );
 	
-	/* Enable interrupt service for GMAC */
-	NVIC_SetPriority( GMAC_IRQn, configMAC_INTERRUPT_PRIORITY);
-	NVIC_EnableIRQ( GMAC_IRQn );
-	/* On interrupt, device-registered peripheral handler GMAC_Handler(), defined above, will be called */
+		/* Enable interrupt service for GMAC */
+		NVIC_SetPriority( GMAC_IRQn, configMAC_INTERRUPT_PRIORITY);
+		NVIC_EnableIRQ( GMAC_IRQn );
+		/* On interrupt, device-registered peripheral handler GMAC_Handler(), defined above, will be called */
 
-	/* Get master clock (MCK) speed; must not exceed 240Mhz for GMAC Management Data Clock (MDC) to 
-	 * conform to 802.3 spec. (Clock may need to be downscaled to work [see CONFIG_SYSCLK_PRES or CONFIG_SYSCLK_DIV]) */
-	mck_hz = sysclk_get_peripheral_hz();
+		/* Get master clock (MCK) speed; must not exceed 240Mhz for GMAC Management Data Clock (MDC) to 
+		 * conform to 802.3 spec. (Clock may need to be downscaled to work [see CONFIG_SYSCLK_PRES or CONFIG_SYSCLK_DIV]) */
+		mck_hz = sysclk_get_peripheral_hz();
 	
-	/* Initialize the Ethernet PHY and store its address for later use */
-	/* JB: NOTE, ethernet_phy_init from ASF was rewritten to return the PHY address */
-	ethernet_phy_addr = 
-		ethernet_phy_init( GMAC, ETHERNET_CONF_PHY_ADDR, mck_hz );
-	configASSERT(ethernet_phy_addr != GMAC_INVALID);
+		/* Initialize the Ethernet PHY and store its address for later use */
+		/* JB: NOTE, ethernet_phy_init from ASF was rewritten to return the PHY address */
+		ethernet_phy_addr = 
+			ethernet_phy_init( GMAC, ETHERNET_CONF_PHY_ADDR, mck_hz );
+		configASSERT(ethernet_phy_addr != GMAC_INVALID);
 	
-	/* Link will be established based upon auto-negotiation if possible */
-	result = ethernet_phy_auto_negotiate( GMAC, ethernet_phy_addr );
-	if (result == GMAC_TIMEOUT) {
-		/* Auto-negotiate timed out, apply default settings if link is up */
-		if (ethernet_phy_set_link( GMAC, ethernet_phy_addr, 1 ) != GMAC_OK) {
-			return pdFAIL; /* Link is down */
-		}
-	} else if (result != GMAC_OK) {
-		return pdFAIL;
+		/* The GMAC driver will call a hook prvRxCallback() on receiving eth frames, which
+		in turn will wake-up the task by calling vTaskNotifyGiveFromISR() */
+		gmac_dev_set_rx_callback( &gs_gmac_dev, QUEUE_INDEX, prvRxCallback );
+
+		#if ipconfigUSE_LLMNR == 1
+			/* In gmac_dev_init, we set the primary MAC address, here we set a second multicast address used 
+			to provide Link Local Multicast Name Resolution (LLMNR) . */
+			gmac_set_address( GMAC, 1, (uint8_t*)llmnr_mac_address );
+		#endif
+		xGmacInitialized = pdTRUE;
 	}
 
-	/* The GMAC driver will call a hook prvRxCallback() on receiving eth frames, which
-	in turn will wake-up the task by calling vTaskNotifyGiveFromISR() */
-	gmac_dev_set_rx_callback( &gs_gmac_dev, QUEUE_INDEX, prvRxCallback );
-
-#if ipconfigUSE_LLMNR == 1
-	/* In gmac_dev_init, we set the primary MAC address, here we set a second multicast address used 
-	to provide Link Local Multicast Name Resolution (LLMNR) . */
-	gmac_set_address( GMAC, 1, (uint8_t*)llmnr_mac_address );
-#endif
-
+	/* Link will be established based upon auto-negotiation if possible */
+	result = ethernet_phy_auto_negotiate( GMAC, ethernet_phy_addr );
+	if( result == GMAC_TIMEOUT )
+	{
+		/* Auto-negotiate timed out, apply default settings if link is up */
+		if( ethernet_phy_set_link( GMAC, ethernet_phy_addr, 1 ) != GMAC_OK )
+		{
+			return pdFAIL; /* Link is down */
+		}
+	}
+	else if( result != GMAC_OK )
+	{
+		return pdFAIL;
+	}
 	return pdPASS;
 }
 /*-----------------------------------------------------------*/
@@ -610,9 +615,9 @@ const TickType_t ulMaxBlockTime = pdMS_TO_TICKS( EMAC_MAX_BLOCK_TIME_MS );
 				ulPHYLinkStatus = xStatus;
 				FreeRTOS_printf( ( "prvEMACHandlerTask: PHY LS now %d\r\n", ( ulPHYLinkStatus & BMSR_LINK_STATUS ) != 0 ) );
 				// Handling link going down and coming back up is unsupported...
-				//if( ( ulPHYLinkStatus & BMSR_LINK_STATUS ) == 0 ) {
-					//FreeRTOS_NetworkDown();
-				//}
+				if( ( ulPHYLinkStatus & BMSR_LINK_STATUS ) == 0 ) {
+					FreeRTOS_NetworkDown();
+				}
 			}
 
 			vTaskSetTimeOutState( &xPhyTime );
